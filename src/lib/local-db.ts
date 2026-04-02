@@ -29,6 +29,7 @@ export function getProgress(): Record<string, Progress> {
 export function updateProgress(id: number, data: Partial<Progress>): void {
   if (typeof window === 'undefined') return
   const p = getProgress()
-  p[String(id)] = { solved: false, starred: false, ...p[String(id)], ...data }
+  const existing = p[String(id)] ?? { solved: false, starred: false }
+  p[String(id)] = { ...existing, ...data }
   localStorage.setItem('lo_progress', JSON.stringify(p))
 }
