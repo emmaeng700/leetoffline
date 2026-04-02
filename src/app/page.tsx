@@ -17,7 +17,7 @@ export default function Home() {
 
       let done = 0
       for (const q of questions) {
-        const url = `/question-images/${q.id}.png`
+        const url = `/question-images/${q.id}.jpg`
         try {
           const cached = await cache.match(url)
           if (!cached) {
