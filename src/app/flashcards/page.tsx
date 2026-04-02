@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, RotateCcw, Shuffle, Star, Home } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Shuffle, Star, Home, Copy, Check } from 'lucide-react'
 import { getVisited, addVisited, getProgress, updateProgress } from '@/lib/local-db'
 import { defaultStudyQuestionOrder } from '@/lib/studyPlanOrder'
+import { CODE_HIGHLIGHT_TOKEN_CSS } from '@/lib/codeHighlightTheme'
 import DifficultyBadge from '@/components/DifficultyBadge'
 
 interface Question {
@@ -14,6 +15,91 @@ interface Question {
   tags: string[]
   python_solution?: string
   explanation?: string
+}
+
+function CodePanel({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  const [highlighted, setHighlighted] = useState<string[]>([])
+  const lines = code.split('\n')
+
+  useEffect(() => {
+    import('highlight.js/lib/core').then(async ({ default: hljs }) => {
+      const python = (await import('highlight.js/lib/languages/python')).default
+      hljs.registerLanguage('python', python)
+      const result = hljs.highlight(code, { language: 'python' })
+      // Split highlighted HTML by newlines preserving spans
+      const raw = result.value
+      const lineHtmls: string[] = []
+      let depth = 0
+      let openTags: string[] = []
+      let current = ''
+      let i = 0
+      while (i < raw.length) {
+        if (raw[i] === '<') {
+          const end = raw.indexOf('>', i)
+          const tag = raw.slice(i, end + 1)
+          if (tag.startsWith('</')) {
+            openTags.pop()
+            depth--
+          } else if (!tag.endsWith('/>')) {
+            openTags.push(tag)
+            depth++
+          }
+          current += tag
+          i = end + 1
+        } else if (raw[i] === '\n') {
+          const closing = openTags.slice().reverse().map(t => {
+            const name = t.match(/<(\w+)/)?.[1] ?? 'span'
+            return `</${name}>`
+          }).join('')
+          const reopening = openTags.join('')
+          lineHtmls.push(current + closing)
+          current = reopening
+          i++
+        } else {
+          current += raw[i++]
+        }
+      }
+      if (current) lineHtmls.push(current)
+      setHighlighted(lineHtmls)
+    })
+  }, [code])
+
+  async function copyCode() {
+    await navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const displayLines = highlighted.length ? highlighted : lines.map(l => l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-700 bg-[#282c34] flex flex-col">
+      <style>{`.fc-hljs .hljs-keyword{color:#c678dd}.fc-hljs .hljs-built_in{color:#e6c07b}.fc-hljs .hljs-string{color:#98c379}.fc-hljs .hljs-number{color:#d19a66}.fc-hljs .hljs-comment{color:#5c6370;font-style:italic}.fc-hljs .hljs-title{color:#61afef}.fc-hljs .hljs-params{color:#abb2bf}.fc-hljs .hljs-operator{color:#56b6c2}.fc-hljs .hljs-punctuation{color:#abb2bf}.fc-hljs .hljs-literal{color:#56b6c2}`}</style>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#21252b] border-b border-gray-700 shrink-0">
+        <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-600 text-white">Python</span>
+        <button onClick={copyCode} className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors">
+          {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      {/* Code */}
+      <div className="overflow-auto p-4 fc-hljs" style={{ maxHeight: 'min(55vh, 480px)' }}>
+        <table className="w-full border-collapse">
+          <tbody>
+            {displayLines.map((html, i) => (
+              <tr key={i} className="hover:bg-white/[0.03]">
+                <td className="text-[#636d83] select-none text-right pr-4 text-xs font-mono w-8 shrink-0 align-top pt-px">{i + 1}</td>
+                <td className="font-mono text-[12px] sm:text-[13px] leading-relaxed text-[#abb2bf] whitespace-pre align-top"
+                  dangerouslySetInnerHTML={{ __html: html || ' ' }} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 export default function FlashcardsPage() {
@@ -136,11 +222,12 @@ export default function FlashcardsPage() {
                     </div>
                     <DifficultyBadge difficulty={card.difficulty} />
                   </div>
-                  <div className="flex-1 flex items-center justify-center">
+                  <div className="flex-1 flex items-center justify-center py-2">
                     <img
                       src={`/question-images/${card.id}.jpg`}
                       alt={card.title}
-                      className="max-w-full max-h-72 object-contain rounded-xl"
+                      className="w-full object-contain rounded-xl"
+                      style={{ maxHeight: 'min(60vh, 520px)' }}
                       onError={e => (e.currentTarget.style.display = 'none')}
                     />
                   </div>
@@ -149,16 +236,22 @@ export default function FlashcardsPage() {
               </div>
             ) : (
               /* Back */
-              <div className="bg-gray-900 rounded-2xl overflow-hidden min-h-[60vh] flex flex-col">
-                <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-                  <span className="text-gray-300 font-semibold text-sm">{card.title}</span>
-                  <span className="text-xs text-gray-500">Tap to flip back</span>
+              <div className="bg-[#1e2127] rounded-2xl overflow-hidden flex flex-col">
+                <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between shrink-0">
+                  <div>
+                    <span className="text-gray-200 font-bold text-sm">{card.title}</span>
+                    <DifficultyBadge difficulty={card.difficulty} />
+                  </div>
+                  <span className="text-xs text-gray-500 italic">Tap to flip back</span>
                 </div>
-                <pre className="flex-1 p-4 text-green-400 text-xs font-mono overflow-auto whitespace-pre-wrap">
-                  {card.python_solution || 'No solution available'}
-                </pre>
+                <div className="p-4">
+                  {card.python_solution
+                    ? <CodePanel code={card.python_solution} />
+                    : <p className="text-gray-500 text-sm text-center py-8">No solution available</p>
+                  }
+                </div>
                 {card.explanation && (
-                  <div className="p-4 border-t border-gray-700 text-xs text-gray-400">
+                  <div className="px-5 pb-4 text-xs text-gray-400 leading-relaxed border-t border-gray-700 pt-3">
                     {card.explanation}
                   </div>
                 )}

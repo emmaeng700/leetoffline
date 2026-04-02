@@ -504,7 +504,7 @@ export default function LineGamePage() {
   const progressPct = Math.round(((idx + 1) / playable.length) * 100)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-16 sm:pb-24">
       <header className="mb-8 rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-gray-100/80">
         <div className="px-5 py-6 sm:px-7 sm:py-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-8">
